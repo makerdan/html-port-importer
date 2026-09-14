@@ -1,0 +1,149 @@
+Purpose:
+
+Transfer an exact normalized HTML source bundle into a dedicated directory
+
+inside another Replit project, then independently verify its contents.
+
+Do not regenerate, rewrite, format, or repair imported source.
+
+Scope:
+
+Build the importer, verifier, harmless fixture, tests, and installation
+
+instructions. Do not integrate it into HTML Port Studio yet. Do not create
+
+other Replit projects, publish an app, or automate GitHub/Replit account actions.
+
+Repository deliverables:
+
+- bin/import.mjs
+- bin/verify.mjs
+- bin/serve.mjs
+- fixtures/hello/bundle.json
+- fixtures/hello/manifest.json
+- Automated tests
+- README.md
+- SKILL.md describing installation, import, verification, and stopping rules
+
+Keep all deliverables tracked in Git. Do not put them under .local/.
+
+Bundle format:
+
+Use a versioned JSON bundle with an explicit entrypoint and a list of files.
+
+Each file must contain a relative path and base64-encoded bytes.
+
+Base64 decoding must be strict.
+
+Manifest format:
+
+Use a versioned JSON manifest containing:
+
+- The SHA-256 of the exact bundle.json bytes
+- The entrypoint
+- Every file's relative path, byte length, and SHA-256
+
+Reject disagreements between the manifest and bundle.
+
+Required command interface:
+
+node bin/import.mjs --bundle <local-file-or-https-url> \
+
+--manifest <local-file-or-https-url> \
+
+--manifest-sha256 <expected-hash> --dest <directory>
+
+node bin/verify.mjs --manifest <local-file> \
+
+--manifest-sha256 <expected-hash> --dest <directory>
+
+node bin/serve.mjs --root <directory> \
+
+--entrypoint <relative-path> --port <port>
+
+Security and correctness:
+
+- Require an expected manifest hash supplied separately from the download.
+- For URL inputs, allow public HTTPS only. Reject credentials in URLs,
+
+private/reserved destinations, unsafe redirects, and HTTPS downgrades.
+
+Ensure DNS validation is enforced on the actual connection.
+
+- Bound download time, response size, file count, path length, and total bytes.
+- Reject duplicate paths, case-colliding paths, absolute paths, traversal,
+
+backslashes, control characters, symlinks, and paths escaping the destination.
+
+- Refuse an existing destination unless it already matches the manifest
+
+exactly; an identical repeat import must succeed without modifying files.
+
+- Stage and verify the import before making the destination available.
+
+Never overwrite or delete unrelated files.
+
+- Do not execute imported code, install its dependencies, or run package scripts.
+- Never log file contents, credentials, or sensitive URL parameters.
+- Verify missing files, extra files, changed bytes, and entrypoint mismatches.
+- The static server must stay inside its root, disable directory listings,
+
+and serve the chosen entrypoint at "/".
+
+- Keep verification reports outside the imported directory.
+
+Fixture:
+
+Create three harmless files:
+
+- index.html
+- assets/style.css
+- assets/app.js
+
+The page must show "Exact import test".
+
+It must have a button labeled "Test interaction".
+
+Clicking the button must show "Interaction passed".
+
+Use no external services, credentials, network requests, or dependencies.
+
+Tests:
+
+Cover a successful exact import, identical repeat import, modified file,
+
+missing file, extra file, wrong manifest hash, wrong bundle hash, invalid
+
+base64, traversal, duplicate paths, symlink rejection, oversized input,
+
+interrupted download, and unsafe redirects.
+
+Documentation:
+
+Explain installation pinned to a full Git commit SHA, all three commands,
+
+expected exit codes, user approval before running imported code, and how
+
+to obtain the fixture manifest hash.
+
+SKILL.md:
+
+Describe how Agent should install and invoke these scripts.
+
+Require actual verifier results before claiming exact transfer.
+
+Distinguish source verification from runtime verification.
+
+Report Verified, Failed, or Blocked.
+
+Do not claim a skill grants API access or guarantees Agent execution.
+
+Do not call an import successful merely because files were downloaded.
+
+At completion:
+
+Run the tests and a local fixture import/verification.
+
+Report the commands, results, and remaining limitations.
+
+Do not claim that installation in another Replit project has been tested yet.
