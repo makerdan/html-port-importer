@@ -30,6 +30,8 @@ import {
 } from 'wouter';
 
 const queryClient = new QueryClient();
+const MAX_BUNDLE_BYTES = 8 * 1024 * 1024;
+const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 
 function Home() {
   const [bundleFile, setBundleFile] = useState<File | null>(null);
@@ -62,6 +64,15 @@ function Home() {
 
   const chooseFile = (kind: 'bundle' | 'manifest', file: File | undefined) => {
     if (!file) return;
+    const limit = kind === 'bundle' ? MAX_BUNDLE_BYTES : MAX_MANIFEST_BYTES;
+    if (file.size > limit) {
+      if (kind === 'bundle') setBundleFile(null);
+      else setManifestFile(null);
+      setStatus('blocked');
+      setStatusMessage('File is too large');
+      setStatusDetail(`${kind === 'bundle' ? 'Bundles' : 'Manifests'} must be ${limit / 1024 / 1024} MB or smaller.`);
+      return;
+    }
     if (kind === 'bundle') setBundleFile(file);
     else setManifestFile(file);
     setStatus('idle');
@@ -77,6 +88,13 @@ function Home() {
       setStatusDetail(operation === 'import'
         ? 'Add a bundle, manifest, 64-character hexadecimal SHA-256, and destination path.'
         : 'Add a manifest, 64-character hexadecimal SHA-256, and destination path.');
+      return;
+    }
+    if (manifestFile.size > MAX_MANIFEST_BYTES ||
+        (operation === 'import' && bundleFile && bundleFile.size > MAX_BUNDLE_BYTES)) {
+      setStatus('blocked');
+      setStatusMessage('File is too large');
+      setStatusDetail('Bundles must be 8 MB or smaller and manifests must be 2 MB or smaller.');
       return;
     }
 
@@ -96,7 +114,7 @@ function Home() {
 
     try {
       const payload = {
-        bundleBase64: bundleFile ? await encodeFile(bundleFile) : undefined,
+        bundleBase64: operation === 'import' && bundleFile ? await encodeFile(bundleFile) : undefined,
         manifestBase64: await encodeFile(manifestFile),
         manifestSha256: manifestHash.toLowerCase(),
         destination: destination.trim(),

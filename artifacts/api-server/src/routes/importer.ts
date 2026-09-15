@@ -11,6 +11,8 @@ const MAX_INPUT_BYTES = 8 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_JSON_FIELD_BYTES = 12 * 1024 * 1024;
 const COMMAND_TIMEOUT_MS = 45_000;
+const MAX_CONCURRENT_IMPORTERS = 2;
+let activeImporters = 0;
 const IMPORT_ROOT = path.resolve(
   process.env.HTML_PORT_IMPORT_ROOT ?? path.join(os.tmpdir(), "html-port-imports"),
 );
@@ -56,6 +58,9 @@ async function validateDestination(value: unknown): Promise<string> {
 }
 
 async function runImporter(args: string[]): Promise<{ status: number; stdout: string; stderr: string }> {
+  if (activeImporters >= MAX_CONCURRENT_IMPORTERS) {
+    throw new Error("Importer capacity is currently full. Try again shortly.");
+  }
   const roots = [
     process.cwd(),
     path.resolve(process.cwd(), "..", ".."),
@@ -64,12 +69,19 @@ async function runImporter(args: string[]): Promise<{ status: number; stdout: st
     existsSync(path.join(root, "bin", "import.mjs")) &&
     existsSync(path.join(root, "lib", "core.mjs")));
   if (!projectRoot) throw new Error("Importer CLI is unavailable.");
+  activeImporters += 1;
   const entrypoint = path.join(projectRoot, "bin", args[0]);
-  const child = spawn(process.execPath, [entrypoint, ...args.slice(1)], {
-    cwd: projectRoot,
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  let child;
+  try {
+    child = spawn(process.execPath, [entrypoint, ...args.slice(1)], {
+      cwd: projectRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch (error) {
+    activeImporters -= 1;
+    throw error;
+  }
   let stdout = "";
   let stderr = "";
   child.stdout.setEncoding("utf8");
@@ -78,17 +90,27 @@ async function runImporter(args: string[]): Promise<{ status: number; stdout: st
   child.stderr.on("data", (chunk: string) => { stderr += chunk; });
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (
+      complete: typeof resolve | typeof reject,
+      value: { status: number; stdout: string; stderr: string } | Error,
+    ) => {
+      if (settled) return;
+      settled = true;
+      activeImporters -= 1;
+      complete(value as never);
+    };
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("Importer timed out."));
+      finish(reject, new Error("Importer timed out."));
     }, COMMAND_TIMEOUT_MS);
     child.once("error", (error) => {
       clearTimeout(timer);
-      reject(error);
+      finish(reject, error);
     });
     child.once("close", (status) => {
       clearTimeout(timer);
-      resolve({ status: status ?? 1, stdout, stderr });
+      finish(resolve, { status: status ?? 1, stdout, stderr });
     });
   });
 }
