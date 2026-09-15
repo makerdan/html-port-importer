@@ -38,8 +38,8 @@ function Home() {
   const [destination, setDestination] = useState('');
   const [operation, setOperation] = useState<'import' | 'verify'>('verify');
   const [status, setStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'blocked'>('idle');
-  const [statusMessage, setStatusMessage] = useState('Waiting for a bundle and manifest');
-  const [statusDetail, setStatusDetail] = useState('Choose a verification mode, then submit an exact bundle.');
+  const [statusMessage, setStatusMessage] = useState('Waiting for source files');
+  const [statusDetail, setStatusDetail] = useState('Verification needs a manifest; import also needs its exact bundle.');
 
   const hashValid = /^[a-fA-F0-9]{64}$/.test(manifestHash);
   const statusTone = useMemo(() => {
@@ -56,8 +56,8 @@ function Home() {
     setManifestHash('');
     setDestination('');
     setStatus('idle');
-    setStatusMessage('Waiting for a bundle and manifest');
-    setStatusDetail('Choose a verification mode, then submit an exact bundle.');
+    setStatusMessage('Waiting for source files');
+    setStatusDetail('Verification needs a manifest; import also needs its exact bundle.');
   };
 
   const chooseFile = (kind: 'bundle' | 'manifest', file: File | undefined) => {
@@ -212,7 +212,7 @@ function Home() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <FilePicker
                   id="bundle-file"
-                  label="HTML bundle"
+                  label="HTML bundle (import only)"
                   hint="bundle.json"
                   icon={<FileArchive size={20} />}
                   file={bundleFile}
@@ -267,11 +267,11 @@ function Home() {
                       type="text"
                       value={destination}
                       onChange={(event) => setDestination(event.target.value)}
-                      placeholder="/var/www/site"
+                      placeholder="my-site"
                       className="focus-ring h-11 w-full rounded-lg border border-input bg-background pl-10 pr-3 font-mono text-xs text-foreground transition-colors placeholder:text-muted-foreground/65"
                     />
                   </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground">The server-side path that will receive the port.</p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">A dedicated folder name inside the server import area.</p>
                 </div>
               </div>
 

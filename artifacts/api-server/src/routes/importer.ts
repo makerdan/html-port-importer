@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -10,6 +11,9 @@ const MAX_INPUT_BYTES = 8 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_JSON_FIELD_BYTES = 12 * 1024 * 1024;
 const COMMAND_TIMEOUT_MS = 45_000;
+const IMPORT_ROOT = path.resolve(
+  process.env.HTML_PORT_IMPORT_ROOT ?? path.join(os.tmpdir(), "html-port-imports"),
+);
 
 type ImporterRequest = {
   bundleBase64?: unknown;
@@ -37,18 +41,32 @@ function validateHash(value: unknown): string {
   return value.toLowerCase();
 }
 
-function validateDestination(value: unknown): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > 4096 ||
-      /[\0-\x1f\x7f]/.test(value)) {
-    throw new Error("Destination must be a valid filesystem path.");
+async function validateDestination(value: unknown): Promise<string> {
+  if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) ||
+      value === "." || value === "..") {
+    throw new Error("Destination must be a single safe folder name.");
   }
-  return path.resolve(value);
+  await fs.mkdir(IMPORT_ROOT, { recursive: true, mode: 0o700 });
+  const rootStat = await fs.lstat(IMPORT_ROOT);
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink() ||
+      await fs.realpath(IMPORT_ROOT) !== IMPORT_ROOT) {
+    throw new Error("The dedicated import area is unsafe.");
+  }
+  return path.join(IMPORT_ROOT, value);
 }
 
 async function runImporter(args: string[]): Promise<{ status: number; stdout: string; stderr: string }> {
-  const entrypoint = path.resolve(process.cwd(), "bin", args[0]);
+  const roots = [
+    process.cwd(),
+    path.resolve(process.cwd(), "..", ".."),
+  ];
+  const projectRoot = roots.find((root) =>
+    existsSync(path.join(root, "bin", "import.mjs")) &&
+    existsSync(path.join(root, "lib", "core.mjs")));
+  if (!projectRoot) throw new Error("Importer CLI is unavailable.");
+  const entrypoint = path.join(projectRoot, "bin", args[0]);
   const child = spawn(process.execPath, [entrypoint, ...args.slice(1)], {
-    cwd: process.cwd(),
+    cwd: projectRoot,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -84,7 +102,10 @@ function responseFromRun(run: { status: number; stdout: string; stderr: string }
       return { status: "Failed", message: "Importer returned an invalid result." };
     }
   }
-  const detail = run.stderr.trim().split("\n").at(-1) || "Importer rejected the request.";
+  const lines = run.stderr.trim().split(/\r?\n/).filter(Boolean);
+  const detail = lines.length === 1 && /^[A-Z_]+: /.test(lines[0])
+    ? lines[0]
+    : "Importer process failed.";
   const blocked = /UNSAFE_URL|DOWNLOAD_TIMEOUT|DOWNLOAD_INTERRUPTED|unsupported|timed out/i.test(detail);
   return { status: blocked ? "Blocked" : "Failed", message: detail.replace(/[\r\n]+/g, " ").slice(0, 500) };
 }
@@ -112,7 +133,7 @@ router.post("/importer/import", async (req, res): Promise<void> => {
     const bundle = decodeTransport(body.bundleBase64, "Bundle", MAX_INPUT_BYTES);
     const manifest = decodeTransport(body.manifestBase64, "Manifest", MAX_MANIFEST_BYTES);
     const hash = validateHash(body.manifestSha256);
-    const destination = validateDestination(body.destination);
+    const destination = await validateDestination(body.destination);
     const result = await withTempFiles(bundle, manifest, async (bundlePath, manifestPath) => {
       const run = await runImporter(["import.mjs", "--bundle", bundlePath!, "--manifest", manifestPath, "--manifest-sha256", hash, "--dest", destination]);
       return responseFromRun(run);
@@ -128,7 +149,7 @@ router.post("/importer/verify", async (req, res): Promise<void> => {
     const body = req.body as ImporterRequest;
     const manifest = decodeTransport(body.manifestBase64, "Manifest", MAX_MANIFEST_BYTES);
     const hash = validateHash(body.manifestSha256);
-    const destination = validateDestination(body.destination);
+    const destination = await validateDestination(body.destination);
     const result = await withTempFiles(null, manifest, async (_bundlePath, manifestPath) => {
       const run = await runImporter(["verify.mjs", "--manifest", manifestPath, "--manifest-sha256", hash, "--dest", destination]);
       return responseFromRun(run);
