@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "HTML Port Importer"
+description = "A browser interface for exact HTML bundle import and independent verification using a separately trusted manifest hash."
+version = "1.0.0"
+id = "artifacts/html-port-importer"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23447
+
+[services.development]
+run = "pnpm --filter @workspace/html-port-importer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/html-port-importer", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/html-port-importer/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23447"
+BASE_PATH = "/"
