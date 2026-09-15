@@ -42,7 +42,6 @@ function Home() {
   const [statusDetail, setStatusDetail] = useState('Choose a verification mode, then submit an exact bundle.');
 
   const hashValid = /^[a-fA-F0-9]{64}$/.test(manifestHash);
-  const formReady = Boolean(bundleFile && manifestFile && hashValid && destination.trim());
   const statusTone = useMemo(() => {
     if (status === 'verified') return 'verified';
     if (status === 'failed') return 'failed';
@@ -72,10 +71,12 @@ function Home() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!bundleFile || !manifestFile || !hashValid || !destination.trim()) {
+    if (!manifestFile || !hashValid || !destination.trim() || (operation === 'import' && !bundleFile)) {
       setStatus('blocked');
       setStatusMessage('Blocked before sending');
-      setStatusDetail('Add both JSON files, a 64-character hexadecimal SHA-256, and a destination path.');
+      setStatusDetail(operation === 'import'
+        ? 'Add a bundle, manifest, 64-character hexadecimal SHA-256, and destination path.'
+        : 'Add a manifest, 64-character hexadecimal SHA-256, and destination path.');
       return;
     }
 
@@ -83,29 +84,40 @@ function Home() {
     setStatusMessage(operation === 'verify' ? 'Verifying bundle' : 'Importing bundle');
     setStatusDetail('The desk is checking the manifest and destination. Imported code is never executed.');
 
-    const payload = new FormData();
-    payload.append('bundle', bundleFile);
-    payload.append('manifest', manifestFile);
-    payload.append('manifestSha256', manifestHash.toLowerCase());
-    payload.append('destinationPath', destination.trim());
+    const encodeFile = async (file: File) => {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+      }
+      return btoa(binary);
+    };
 
     try {
-      const response = await fetch(`/api/html-port/${operation}`, {
+      const payload = {
+        bundleBase64: bundleFile ? await encodeFile(bundleFile) : undefined,
+        manifestBase64: await encodeFile(manifestFile),
+        manifestSha256: manifestHash.toLowerCase(),
+        destination: destination.trim(),
+      };
+      const response = await fetch(`/api/importer/${operation}`, {
         method: 'POST',
-        body: payload,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
         credentials: 'include',
       });
-      let responseBody: { message?: string; detail?: string } = {};
+      let responseBody: { status?: string; message?: string; detail?: string } = {};
       try {
         responseBody = await response.json();
       } catch {
         responseBody = {};
       }
-      if (response.ok) {
+      if (response.ok && responseBody.status === 'Verified') {
         setStatus('verified');
         setStatusMessage(operation === 'verify' ? 'Verified' : 'Imported and verified');
         setStatusDetail(responseBody.message ?? 'The manifest matches the trusted SHA-256 and the destination is accepted.');
-      } else if (response.status === 401 || response.status === 403 || response.status === 409) {
+      } else if (responseBody.status === 'Blocked' || response.status === 401 || response.status === 403 || response.status === 409) {
         setStatus('blocked');
         setStatusMessage('Blocked by the transfer desk');
         setStatusDetail(responseBody.detail ?? responseBody.message ?? 'The server refused this operation. No files were written.');
