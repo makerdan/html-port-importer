@@ -1,0 +1,120 @@
+Below is a simpler but still detailed version. Follow the steps in order.
+
+What we are testing
+We want to test this:
+
+Put an importer in a public GitHub repository.
+Create a Replit project.
+Ask Agent to download the importer from GitHub.
+Ask Agent to use the importer to copy a few test files.
+Check that the copied files are exactly correct.
+This does not test automatic Replit project creation yet.
+
+Part 1: Create the importer
+Step 1: Create a GitHub repository
+Go to GitHub.
+Click New repository.
+Name it:
+html-port-importer
+
+Select Public.
+Select Add a README file.
+Click Create repository.
+The repository URL should look like this:
+
+https://github.com/YOUR-USERNAME/html-port-importer
+
+Replace YOUR-USERNAME with your GitHub username.
+
+Do not put passwords, API keys, private files, or real user source code in this repository.
+
+Step 2: Import that repository into Replit
+Create a new Replit project by importing the GitHub repository.
+Name the Replit project:
+HTML Port Importer
+
+Open the project in Replit.
+Open Agent.
+Step 3: Ask Agent to build the importer
+Copy and paste this entire message into Agent:
+
+Build a small file importer in this project.
+The importer will later be installed into another Replit project from GitHub.
+For now, create these files:
+- import.mjs
+- verify.mjs
+- fixtures/index.html
+- fixtures/style.css
+- fixtures/app.js
+- fixtures/manifest.json
+- README.md
+The fixture should be a tiny harmless website.
+The page must show this text:
+Exact import test
+The page must have a button labeled:
+Test interaction
+When the button is clicked, it must show:
+Interaction passed
+The importer must copy the fixture files into a folder named:
+imported-app
+The importer must not change files outside imported-app.
+The importer must not run the imported files.
+The importer must reject unsafe file paths such as:
+../secret.txt
+/secret.txt
+The importer must check the SHA-256 hash of every imported file against manifest.json.
+The importer must have this command:
+node import.mjs
+Running node import.mjs should:
+1. Read fixtures/manifest.json.
+2. Copy the fixture files into imported-app.
+3. Check every file hash.
+4. Stop with an error if a hash is wrong.
+5. Leave correct files unchanged if it is run a second time.
+The verifier must have this command:
+node verify.mjs
+Running node verify.mjs should:
+1. Read fixtures/manifest.json.
+2. Check that every expected file exists.
+3. Check that every file has the expected SHA-256 hash.
+4. Report PASS or FAIL.
+The README must explain:
+1. How to run the importer.
+2. How to run the verifier.
+3. What files are created.
+4. That the importer does not execute imported source files.
+Add simple tests or a simple test procedure for:
+- A successful import.
+- A second import.
+- A wrong file hash.
+- A missing file.
+- An unsafe path containing ../.
+Do not add credentials.
+Do not connect to private services.
+Do not create another Replit project.
+Do not publish anything.
+
+Wait for Agent to finish.
+
+Step 4: Test the importer
+Copy and paste this into Agent:
+
+Test the importer now.
+Run the importer:
+node import.mjs
+Then run the verifier:
+node verify.mjs
+Confirm all of the following:
+1. imported-app/index.html exists.
+2. imported-app/style.css exists.
+3. imported-app/app.js exists.
+4. The verifier reports PASS.
+5. Running node import.mjs a second time does not change correct files.
+6. A wrong hash is rejected.
+7. A path containing ../ is rejected.
+8. No file outside imported-app was changed.
+Report each result as PASS or FAIL.
+If anything fails, stop and explain the failure.
+Do not hide a failure by removing the test.
+
+Do not continue until the tests pass.
