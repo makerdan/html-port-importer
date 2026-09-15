@@ -4,7 +4,49 @@ A small, dependency-free Node.js tool for transferring an exact, normalized HTML
 
 Requires Node.js 20 or newer on Linux with `/proc/self/fd` available (including Replit). Descriptor-relative traversal prevents verification and serving from following swapped path ancestors. Other operating systems are not supported.
 
-## Install
+## Simple fixture workflow
+
+Run the importer from the repository root:
+
+```sh
+node import.mjs
+```
+
+This reads `fixtures/manifest.json`, validates the SHA-256 and byte length of
+`fixtures/index.html`, `fixtures/style.css`, and `fixtures/app.js`, and copies
+the exact files into `imported-app`. It does not write outside `imported-app`
+and never executes the imported source.
+
+Verify the imported files independently:
+
+```sh
+node verify.mjs
+```
+
+Success prints `PASS`. A missing file, extra file, changed hash, symlink,
+non-regular file, or unsafe manifest path prints `FAIL` and exits nonzero.
+Running `node import.mjs` again leaves an already-correct `imported-app`
+unchanged.
+
+The fixture is a harmless static page with the heading **Exact import test**.
+Its **Test interaction** button displays **Interaction passed** when clicked.
+
+Files created by the simple importer:
+
+```text
+imported-app/
+├── app.js
+├── index.html
+└── style.css
+```
+
+Run all automated checks with:
+
+```sh
+npm test
+```
+
+## Install from GitHub
 
 Pin installation to a full Git commit SHA. Replace `<FULL_COMMIT_SHA>` with the 40-character commit you reviewed:
 
@@ -16,7 +58,9 @@ git checkout <FULL_COMMIT_SHA>
 
 Do not install from an unpinned branch or tag when exact transfer is required.
 
-## Import
+Installation into another Replit project has not been tested by this repository.
+
+## Advanced exact-bundle import
 
 Obtain the expected manifest SHA-256 through a separate trusted channel from the bundle and manifest:
 
@@ -30,7 +74,7 @@ node bin/import.mjs \
 
 The importer validates the separately supplied manifest hash, validates the exact bundle hash and every file, stages the complete tree, verifies it, atomically reserves the destination, and atomically renames the stage over that importer-owned empty reservation. An existing destination is accepted only if it already matches exactly; that repeat operation does not modify it.
 
-## Verify
+## Advanced independent verification
 
 Keep any captured verification report outside the imported directory:
 
@@ -74,5 +118,3 @@ The fixture manifest hash can be obtained locally with:
 ```sh
 sha256sum fixtures/hello/manifest.json
 ```
-
-Installation into another Replit project has not been tested by this repository.

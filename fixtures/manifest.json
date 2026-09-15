@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 467,
+      "sha256": "f094738af585892248c13153887dddb04b56b15b0d544853f665e7f89cb4eae3"
+    },
+    {
+      "path": "style.css",
+      "bytes": 397,
+      "sha256": "874648a54c41a626299c69d81521f2a57f4ccc5af08f249f9ade61a2a6bbe385"
+    },
+    {
+      "path": "app.js",
+      "bytes": 195,
+      "sha256": "61466eff54810a0031520d8f0de3386c269e1bd8878be3d9708cdf693516df29"
+    }
+  ]
+}
